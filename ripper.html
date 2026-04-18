@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motion Ripper</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            color-scheme: dark;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at top left, rgba(14, 116, 144, 0.28), transparent 38%),
+                radial-gradient(circle at top right, rgba(21, 128, 61, 0.18), transparent 32%),
+                linear-gradient(180deg, #050816 0%, #09111f 50%, #05070d 100%);
+        }
+
+        #video-stage {
+            position: relative;
+            min-height: 340px;
+            overflow: hidden;
+        }
+
+        #source-video,
+        #pose-overlay {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #source-video {
+            object-fit: contain;
+            background:
+                radial-gradient(circle at top, rgba(22, 78, 99, 0.32), transparent 48%),
+                linear-gradient(180deg, rgba(10, 16, 30, 0.95), rgba(4, 8, 16, 1));
+        }
+
+        #pose-overlay {
+            pointer-events: none;
+        }
+
+        #preview-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .glass-card {
+            background: rgba(7, 12, 23, 0.72);
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            box-shadow: 0 28px 60px rgba(2, 8, 23, 0.42);
+            backdrop-filter: blur(20px);
+        }
+
+        .metric-pill {
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            background: rgba(15, 23, 42, 0.62);
+        }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body class="text-slate-100 antialiased">
+    <div class="relative min-h-screen p-4 lg:p-6">
+        <div class="grid h-[calc(100vh-2rem)] grid-cols-1 gap-4 xl:h-[calc(100vh-3rem)] xl:grid-cols-[22rem,minmax(0,1fr)]">
+            <aside class="glass-card flex min-h-0 flex-col rounded-[1.6rem] p-5">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.32em] text-cyan-300/80">Motion Capture</p>
+                        <h1 class="mt-2 text-2xl font-semibold text-white">Motion Ripper</h1>
+                        <p class="mt-2 text-sm leading-6 text-slate-400">
+                            Share a screen with a playing video, let MediaPipe read the performer, then record a Fast Poser animation you can import back into the main scene.
+                        </p>
+                    </div>
+                    <a href="./Index.html" class="inline-flex shrink-0 items-center rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:bg-white/10">Back To Poser</a>
+                </div>
+
+                <div class="mt-5 space-y-3">
+                    <button id="share-screen-btn" class="w-full rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400">
+                        Share Screen / Window
+                    </button>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="stop-share-btn" class="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-white/10">
+                            Stop Share
+                        </button>
+                        <button id="neutral-btn" class="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-white/10">
+                            Set Neutral
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mt-5 rounded-3xl border border-white/10 bg-white/[0.035] p-4">
+                    <div class="flex items-center justify-between gap-3">
+                        <h2 class="text-sm font-semibold text-white">Recording</h2>
+                        <span id="recording-badge" class="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-200">Idle</span>
+                    </div>
+
+                    <div class="mt-4 space-y-3">
+                        <label class="block">
+                            <span class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Animation Name</span>
+                            <input id="animation-name" type="text" class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-3 py-2.5 text-sm text-white outline-none transition focus:border-cyan-400" placeholder="kick-rip">
+                        </label>
+
+                        <div class="grid grid-cols-[1fr,7rem] gap-3">
+                            <label class="block">
+                                <span class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Character Color</span>
+                                <input id="character-color" type="color" value="#5eead4" class="h-[46px] w-full cursor-pointer rounded-2xl border border-white/10 bg-slate-950/70 p-1.5">
+                            </label>
+                            <label class="block">
+                                <span class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Sample Rate</span>
+                                <select id="sample-rate" class="h-[46px] w-full rounded-2xl border border-white/10 bg-slate-950/70 px-3 text-sm text-white outline-none transition focus:border-cyan-400">
+                                    <option value="10">10 fps</option>
+                                    <option value="5">5 fps</option>
+                                </select>
+                            </label>
+                        </div>
+
+                        <label class="block">
+                            <div class="mb-1.5 flex items-center justify-between gap-3">
+                                <span class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Pose Smoothing</span>
+                                <span id="smoothing-value" class="text-xs font-semibold text-cyan-200">0.55</span>
+                            </div>
+                            <input id="smoothing" type="range" min="0" max="0.85" step="0.05" value="0.55" class="w-full accent-cyan-400">
+                        </label>
+
+                        <label class="flex items-start gap-3 rounded-2xl border border-white/10 bg-slate-950/45 px-3 py-3">
+                            <input id="root-motion" type="checkbox" checked class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400 focus:ring-cyan-400">
+                            <span>
+                                <span class="block text-sm font-medium text-white">Track root motion</span>
+                                <span class="mt-1 block text-xs leading-5 text-slate-400">Moves hips in X/Y/Z relative to your neutral frame. Turn this off if you only want limb motion.</span>
+                            </span>
+                        </label>
+                    </div>
+
+                    <div class="mt-4 grid grid-cols-2 gap-2">
+                        <button id="record-btn" class="rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-400">
+                            Start Record
+                        </button>
+                        <button id="clear-btn" class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10">
+                            Clear Capture
+                        </button>
+                        <button id="save-library-btn" class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10">
+                            Save To Library
+                        </button>
+                        <button id="export-btn" class="rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-white">
+                            Export JSON
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mt-5 grid grid-cols-2 gap-2">
+                    <div class="metric-pill rounded-2xl px-3 py-3">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Tracked</p>
+                        <p id="tracked-state" class="mt-1 text-sm font-semibold text-white">Waiting</p>
+                    </div>
+                    <div class="metric-pill rounded-2xl px-3 py-3">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Confidence</p>
+                        <p id="confidence-value" class="mt-1 text-sm font-semibold text-white">0%</p>
+                    </div>
+                    <div class="metric-pill rounded-2xl px-3 py-3">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Keyframes</p>
+                        <p id="frame-count" class="mt-1 text-sm font-semibold text-white">0</p>
+                    </div>
+                    <div class="metric-pill rounded-2xl px-3 py-3">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Length</p>
+                        <p id="duration-value" class="mt-1 text-sm font-semibold text-white">0.0s</p>
+                    </div>
+                </div>
+
+                <div class="mt-5 rounded-3xl border border-white/10 bg-slate-950/55 p-4">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Status</p>
+                    <p id="status-text" class="mt-2 text-sm leading-6 text-slate-300">
+                        Loading MediaPipe. Once ready, share the screen that contains the source video.
+                    </p>
+                </div>
+
+                <div class="mt-5 rounded-3xl border border-white/10 bg-white/[0.035] p-4">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Workflow</p>
+                    <ol class="mt-3 space-y-2 text-sm leading-6 text-slate-300">
+                        <li>1. Share the window or screen where the reference video is playing.</li>
+                        <li>2. Let the cyan skeleton lock onto the performer, then click <span class="font-semibold text-white">Set Neutral</span>.</li>
+                        <li>3. Press <span class="font-semibold text-white">Start Record</span>, play the move, then stop and export or save.</li>
+                    </ol>
+                </div>
+            </aside>
+
+            <main class="grid min-h-0 grid-cols-1 gap-4 2xl:grid-cols-[1.08fr,0.92fr]">
+                <section class="glass-card flex min-h-0 flex-col rounded-[1.8rem] p-4">
+                    <div class="mb-3 flex items-center justify-between gap-4">
+                        <div>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Shared Video</p>
+                            <h2 class="mt-1 text-lg font-semibold text-white">Pose Feed</h2>
+                        </div>
+                        <span id="video-meta" class="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300">No stream</span>
+                    </div>
+                    <div id="video-stage" class="min-h-0 flex-1 rounded-[1.5rem] border border-white/10 bg-slate-950/90">
+                        <video id="source-video" autoplay muted playsinline></video>
+                        <canvas id="pose-overlay"></canvas>
+                    </div>
+                </section>
+
+                <section class="glass-card flex min-h-0 flex-col rounded-[1.8rem] p-4">
+                    <div class="mb-3 flex items-center justify-between gap-4">
+                        <div>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Rig Preview</p>
+                            <h2 class="mt-1 text-lg font-semibold text-white">Mapped Character</h2>
+                        </div>
+                        <a href="./Index.html" class="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:bg-white/10">
+                            Open Index
+                        </a>
+                    </div>
+                    <div class="min-h-0 flex-1 overflow-hidden rounded-[1.5rem] border border-white/10 bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.16),_transparent_36%),linear-gradient(180deg,_rgba(15,23,42,0.95),_rgba(2,6,23,1))]">
+                        <canvas id="preview-canvas"></canvas>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { FilesetResolver, PoseLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21-rc.20250105/vision_bundle.mjs';
+
+        const ASSET_FORMAT = 'fast-poser-asset';
+        const ASSET_VERSION = 1;
+        const MAIN_ANIMATION_STORAGE_KEY = 'fast-poser:animation-library';
+        const MEDIAPIPE_WASM_ROOT = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21-rc.20250105/wasm';
+        const MEDIAPIPE_MODEL_PATH = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+        const ROOT_BASE_POSITION = new THREE.Vector3(0, 2.6, 0);
+        const DOWN_AXIS = new THREE.Vector3(0, -1, 0);
+        const DEFAULT_COLOR = '#5eead4';
+        const KEYFRAME_TIME_STEP = 0.1;
+        const JOINT_ORDER = [
+            'Hips_0',
+            'Spine_0',
+            'Head_0',
+            'Left_Upper_Arm_0',
+            'Left_Lower_Arm_0',
+            'Right_Upper_Arm_0',
+            'Right_Lower_Arm_0',
+            'Left_Upper_Leg_0',
+            'Left_Lower_Leg_0',
+            'Right_Upper_Leg_0',
+            'Right_Lower_Leg_0'
+        ];
+        const JOINT_PARENTS = {
+            Hips_0: null,
+            Spine_0: 'Hips_0',
+            Head_0: 'Spine_0',
+            Left_Upper_Arm_0: 'Spine_0',
+            Left_Lower_Arm_0: 'Left_Upper_Arm_0',
+            Right_Upper_Arm_0: 'Spine_0',
+            Right_Lower_Arm_0: 'Right_Upper_Arm_0',
+            Left_Upper_Leg_0: 'Hips_0',
+            Left_Lower_Leg_0: 'Left_Upper_Leg_0',
+            Right_Upper_Leg_0: 'Hips_0',
+            Right_Lower_Leg_0: 'Right_Upper_Leg_0'
+        };
+        const CONNECTIONS = [
+            [11, 12],
+            [11, 13],
+            [13, 15],
+            [12, 14],
+            [14, 16],
+            [11, 23],
+            [12, 24],
+            [23, 24],
+            [23, 25],
+            [25, 27],
+            [24, 26],
+            [26, 28],
+            [0, 11],
+            [0, 12]
+        ];
+        const LM = {
+            NOSE: 0,
+            LEFT_EAR: 7,
+            RIGHT_EAR: 8,
+            LEFT_SHOULDER: 11,
+            RIGHT_SHOULDER: 12,
+            LEFT_ELBOW: 13,
+            RIGHT_ELBOW: 14,
+            LEFT_WRIST: 15,
+            RIGHT_WRIST: 16,
+            LEFT_HIP: 23,
+            RIGHT_HIP: 24,
+            LEFT_KNEE: 25,
+            RIGHT_KNEE: 26,
+            LEFT_ANKLE: 27,
+            RIGHT_ANKLE: 28
+        };
+
+        const ui = {};
+        let scene;
+        let camera;
+        let renderer;
+        let orbitControls;
+        let previewRoot;
+        let defaultPoseState;
+        let currentPoseState;
+        let poseLandmarker = null;
+        let mediaStream = null;
+        let animationFrameId = 0;
+        let lastProcessedVideoTime = -1;
+        let isRecording = false;
+        let recordingStartedAt = 0;
+        let lastSampledAt = -Infinity;
+        let recordedFrames = [];
+        let latestPosePacket = null;
+        let rootBaseline = null;
+
+        init();
+
+        function init() {
+            cacheUi();
+            bindUi();
+            initScene();
+            createPreviewCharacter();
+            defaultPoseState = captureCharacterPose();
+            currentPoseState = clonePoseState(defaultPoseState);
+            applyPoseState(currentPoseState);
+            setGeneratedAnimationName();
+            updateSmoothingLabel();
+            updateRecordingUi();
+            updateStats();
+            handleResize();
+            warmupMediaPipe();
+            window.addEventListener('resize', handleResize);
+        }
+
+        function cacheUi() {
+            ui.shareScreenBtn = document.getElementById('share-screen-btn');
+            ui.stopShareBtn = document.getElementById('stop-share-btn');
+            ui.neutralBtn = document.getElementById('neutral-btn');
+            ui.recordBtn = document.getElementById('record-btn');
+            ui.clearBtn = document.getElementById('clear-btn');
+            ui.saveLibraryBtn = document.getElementById('save-library-btn');
+            ui.exportBtn = document.getElementById('export-btn');
+            ui.animationName = document.getElementById('animation-name');
+            ui.characterColor = document.getElementById('character-color');
+            ui.sampleRate = document.getElementById('sample-rate');
+            ui.smoothing = document.getElementById('smoothing');
+            ui.smoothingValue = document.getElementById('smoothing-value');
+            ui.rootMotion = document.getElementById('root-motion');
+            ui.recordingBadge = document.getElementById('recording-badge');
+            ui.trackedState = document.getElementById('tracked-state');
+            ui.confidenceValue = document.getElementById('confidence-value');
+            ui.frameCount = document.getElementById('frame-count');
+            ui.durationValue = document.getElementById('duration-value');
+            ui.statusText = document.getElementById('status-text');
+            ui.videoMeta = document.getElementById('video-meta');
+            ui.sourceVideo = document.getElementById('source-video');
+            ui.poseOverlay = document.getElementById('pose-overlay');
+            ui.previewCanvas = document.getElementById('preview-canvas');
+        }
+
+        function bindUi() {
+            ui.shareScreenBtn.addEventListener('click', startScreenShare);
+            ui.stopShareBtn.addEventListener('click', stopScreenShare);
+            ui.neutralBtn.addEventListener('click', captureNeutralPose);
+            ui.recordBtn.addEventListener('click', toggleRecording);
+            ui.clearBtn.addEventListener('click', clearRecording);
+            ui.saveLibraryBtn.addEventListener('click', saveAnimationToLibrary);
+            ui.exportBtn.addEventListener('click', exportAnimation);
+            ui.characterColor.addEventListener('input', () => setCharacterColor(previewRoot, ui.characterColor.value));
+            ui.smoothing.addEventListener('input', updateSmoothingLabel);
+            ui.sourceVideo.addEventListener('loadedmetadata', () => {
+                ui.videoMeta.textContent = `${ui.sourceVideo.videoWidth}x${ui.sourceVideo.videoHeight}`;
+                resizeOverlayCanvas();
+            });
+            ui.sourceVideo.addEventListener('emptied', () => {
+                ui.videoMeta.textContent = 'No stream';
+                clearOverlay();
+            });
+        }
+
+        function initScene() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050816);
+            scene.fog = new THREE.Fog(0x050816, 10, 26);
+
+            camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+            camera.position.set(0, 4.8, 10.5);
+
+            renderer = new THREE.WebGLRenderer({
+                canvas: ui.previewCanvas,
+                antialias: true,
+                alpha: true
+            });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(ui.previewCanvas.clientWidth, ui.previewCanvas.clientHeight, false);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+            scene.add(ambientLight);
+
+            const keyLight = new THREE.DirectionalLight(0xffffff, 1.4);
+            keyLight.position.set(6, 10, 5);
+            keyLight.castShadow = true;
+            keyLight.shadow.mapSize.width = 2048;
+            keyLight.shadow.mapSize.height = 2048;
+            scene.add(keyLight);
+
+            const rimLight = new THREE.DirectionalLight(0x67e8f9, 0.7);
+            rimLight.position.set(-6, 6, -4);
+            scene.add(rimLight);
+
+            const fillLight = new THREE.PointLight(0x34d399, 0.8, 20);
+            fillLight.position.set(0, 5, 4);
+            scene.add(fillLight);
+
+            const grid = new THREE.GridHelper(30, 30, 0x1e293b, 0x0f172a);
+            scene.add(grid);
+
+            const floor = new THREE.Mesh(
+                new THREE.PlaneGeometry(50, 50),
+                new THREE.MeshStandardMaterial({ color: 0x07111f, roughness: 0.9, metalness: 0.05 })
+            );
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            scene.add(floor);
+
+            orbitControls = new OrbitControls(camera, renderer.domElement);
+            orbitControls.enableDamping = true;
+            orbitControls.dampingFactor = 0.08;
+            orbitControls.target.set(0, 2.6, 0);
+            orbitControls.maxPolarAngle = Math.PI / 2 - 0.08;
+
+            renderer.setAnimationLoop(renderScene);
+        }
+
+        function createPreviewCharacter() {
+            if (previewRoot) {
+                scene.remove(previewRoot);
+            }
+
+            const color = new THREE.Color(ui.characterColor.value || DEFAULT_COLOR);
+            const material = new THREE.MeshStandardMaterial({
+                color,
+                roughness: 0.42,
+                metalness: 0.08
+            });
+
+            previewRoot = createLimb(1.0, 0.4, 0.6, 0, material, 'Hips', 0);
+            previewRoot.position.copy(ROOT_BASE_POSITION);
+
+            const spine = createLimb(0.9, 1.2, 0.5, 0.6, material, 'Spine', 0);
+            spine.position.set(0, 0.2, 0);
+            previewRoot.add(spine);
+
+            const head = createLimb(0.7, 0.8, 0.7, 0.4, material, 'Head', 0);
+            head.position.set(0, 1.2, 0);
+            spine.add(head);
+
+            const armWidth = 0.25;
+            const leftUpperArm = createLimb(armWidth, 0.9, armWidth, -0.45, material, 'Left_Upper_Arm', 0);
+            leftUpperArm.position.set(0.6, 1.1, 0);
+            spine.add(leftUpperArm);
+
+            const leftLowerArm = createLimb(armWidth * 0.9, 0.9, armWidth * 0.9, -0.45, material, 'Left_Lower_Arm', 0);
+            leftLowerArm.position.set(0, -0.9, 0);
+            leftUpperArm.add(leftLowerArm);
+
+            const rightUpperArm = createLimb(armWidth, 0.9, armWidth, -0.45, material, 'Right_Upper_Arm', 0);
+            rightUpperArm.position.set(-0.6, 1.1, 0);
+            spine.add(rightUpperArm);
+
+            const rightLowerArm = createLimb(armWidth * 0.9, 0.9, armWidth * 0.9, -0.45, material, 'Right_Lower_Arm', 0);
+            rightLowerArm.position.set(0, -0.9, 0);
+            rightUpperArm.add(rightLowerArm);
+
+            const legWidth = 0.35;
+            const leftUpperLeg = createLimb(legWidth, 1.1, legWidth, -0.55, material, 'Left_Upper_Leg', 0);
+            leftUpperLeg.position.set(0.25, -0.2, 0);
+            previewRoot.add(leftUpperLeg);
+
+            const leftLowerLeg = createLimb(legWidth * 0.9, 1.1, legWidth * 0.9, -0.55, material, 'Left_Lower_Leg', 0);
+            leftLowerLeg.position.set(0, -1.1, 0);
+            leftUpperLeg.add(leftLowerLeg);
+
+            const rightUpperLeg = createLimb(legWidth, 1.1, legWidth, -0.55, material, 'Right_Upper_Leg', 0);
+            rightUpperLeg.position.set(-0.25, -0.2, 0);
+            previewRoot.add(rightUpperLeg);
+
+            const rightLowerLeg = createLimb(legWidth * 0.9, 1.1, legWidth * 0.9, -0.55, material, 'Right_Lower_Leg', 0);
+            rightLowerLeg.position.set(0, -1.1, 0);
+            rightUpperLeg.add(rightLowerLeg);
+
+            leftUpperArm.rotation.z = 0.2;
+            rightUpperArm.rotation.z = -0.2;
+            leftUpperLeg.rotation.x = 0.05;
+            rightUpperLeg.rotation.x = -0.05;
+
+            previewRoot.userData.characterColor = `#${color.getHexString()}`;
+            scene.add(previewRoot);
+        }
+
+        function createLimb(width, height, depth, pivotYOffset, material, name, charId) {
+            const group = new THREE.Group();
+            group.name = `${name}_${charId}`;
+
+            const geometry = new THREE.BoxGeometry(width, height, depth);
+            geometry.translate(0, pivotYOffset, 0);
+
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            group.add(mesh);
+
+            return group;
+        }
+
+        function setCharacterColor(root, value) {
+            if (!root) return;
+
+            const color = new THREE.Color(value || DEFAULT_COLOR);
+            root.traverse(object => {
+                if (!object.isMesh || !object.material?.color) return;
+                object.material.color.copy(color);
+            });
+            root.userData.characterColor = `#${color.getHexString()}`;
+        }
+
+        function captureCharacterPose() {
+            const pose = {};
+            previewRoot.traverse(object => {
+                if (!object.isGroup || !object.name || !JOINT_ORDER.includes(object.name)) return;
+                pose[object.name] = {
+                    position: object.position.clone(),
+                    quaternion: object.quaternion.clone()
+                };
+            });
+            return pose;
+        }
+
+        function clonePoseState(source) {
+            const pose = {};
+            JOINT_ORDER.forEach(name => {
+                const transform = source[name];
+                pose[name] = {
+                    position: transform.position.clone(),
+                    quaternion: transform.quaternion.clone()
+                };
+            });
+            return pose;
+        }
+
+        function applyPoseState(pose) {
+            if (!pose) return;
+
+            previewRoot.traverse(object => {
+                if (!object.isGroup || !object.name || !pose[object.name]) return;
+                object.position.copy(pose[object.name].position);
+                object.quaternion.copy(pose[object.name].quaternion);
+            });
+        }
+
+        async function warmupMediaPipe() {
+            try {
+                await ensurePoseLandmarker();
+                setStatus('MediaPipe is ready. Share the window or screen where your reference clip is playing.', 'success');
+            } catch (error) {
+                console.error(error);
+                setStatus('MediaPipe could not load. Check your internet connection and reload this page.', 'error');
+            }
+        }
+
+        async function ensurePoseLandmarker() {
+            if (poseLandmarker) {
+                return poseLandmarker;
+            }
+
+            setStatus('Loading MediaPipe pose tracker...', 'info');
+            const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_ROOT);
+
+            try {
+                poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+                    baseOptions: {
+                        modelAssetPath: MEDIAPIPE_MODEL_PATH,
+                        delegate: 'GPU'
+                    },
+                    runningMode: 'VIDEO',
+                    numPoses: 1,
+                    minPoseDetectionConfidence: 0.55,
+                    minPosePresenceConfidence: 0.55,
+                    minTrackingConfidence: 0.55
+                });
+            } catch (error) {
+                poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+                    baseOptions: {
+                        modelAssetPath: MEDIAPIPE_MODEL_PATH,
+                        delegate: 'CPU'
+                    },
+                    runningMode: 'VIDEO',
+                    numPoses: 1,
+                    minPoseDetectionConfidence: 0.55,
+                    minPosePresenceConfidence: 0.55,
+                    minTrackingConfidence: 0.55
+                });
+            }
+
+            return poseLandmarker;
+        }
+
+        async function startScreenShare() {
+            try {
+                await ensurePoseLandmarker();
+
+                if (mediaStream) {
+                    stopScreenShare({ preservePose: true, skipStatus: true });
+                }
+
+                mediaStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        frameRate: { ideal: 30, max: 30 }
+                    },
+                    audio: false
+                });
+
+                const [videoTrack] = mediaStream.getVideoTracks();
+                if (videoTrack) {
+                    videoTrack.addEventListener('ended', () => {
+                        const activeTrack = mediaStream?.getVideoTracks?.()[0];
+                        if (activeTrack !== videoTrack) return;
+                        stopScreenShare({ preservePose: true });
+                    });
+                    ui.videoMeta.textContent = videoTrack.label || 'Shared stream';
+                }
+
+                ui.sourceVideo.srcObject = mediaStream;
+                await ui.sourceVideo.play();
+                rootBaseline = null;
+                resizeOverlayCanvas();
+
+                lastProcessedVideoTime = -1;
+                processFrame();
+                setStatus('Screen share connected. Play the reference video, wait for the skeleton, then record.', 'success');
+            } catch (error) {
+                console.error(error);
+                const message = error?.name === 'NotAllowedError'
+                    ? 'Screen sharing was canceled or blocked.'
+                    : 'Could not start screen sharing.';
+                setStatus(message, 'error');
+            }
+        }
+
+        function stopScreenShare(options = {}) {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = 0;
+            }
+
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+
+            ui.sourceVideo.pause();
+            ui.sourceVideo.srcObject = null;
+            lastProcessedVideoTime = -1;
+            latestPosePacket = null;
+            ui.trackedState.textContent = 'Waiting';
+            ui.confidenceValue.textContent = '0%';
+            clearOverlay();
+
+            if (!options.preservePose) {
+                currentPoseState = clonePoseState(defaultPoseState);
+                applyPoseState(currentPoseState);
+            }
+
+            if (!options.skipStatus) {
+                setStatus('Screen share stopped. You can still export the captured frames, or share a new source.', 'info');
+            }
+        }
+
+        function processFrame() {
+            animationFrameId = requestAnimationFrame(processFrame);
+
+            if (!poseLandmarker || !mediaStream) return;
+            if (ui.sourceVideo.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+            if (ui.sourceVideo.currentTime === lastProcessedVideoTime) return;
+
+            lastProcessedVideoTime = ui.sourceVideo.currentTime;
+
+            let result;
+            try {
+                result = poseLandmarker.detectForVideo(ui.sourceVideo, performance.now());
+            } catch (error) {
+                console.error(error);
+                setStatus('Pose detection hit an error while reading the shared video.', 'error');
+                return;
+            }
+
+            const landmarks = result?.landmarks?.[0];
+            const worldLandmarks = result?.worldLandmarks?.[0];
+
+            if (!landmarks || !worldLandmarks) {
+                latestPosePacket = null;
+                ui.trackedState.textContent = 'Searching';
+                ui.confidenceValue.textContent = '0%';
+                clearOverlay();
+                return;
+            }
+
+            latestPosePacket = { landmarks, worldLandmarks };
+            ui.trackedState.textContent = 'Locked';
+            ui.confidenceValue.textContent = `${Math.round(getPoseConfidence(landmarks) * 100)}%`;
+            drawOverlay(landmarks);
+
+            const targetPose = buildPoseFromLandmarks(landmarks, worldLandmarks);
+            if (!targetPose) return;
+
+            currentPoseState = smoothPoseState(currentPoseState, targetPose, Number.parseFloat(ui.smoothing.value) || 0);
+            applyPoseState(currentPoseState);
+            samplePoseIfRecording(performance.now());
+        }
+
+        function buildPoseFromLandmarks(landmarks, worldLandmarks) {
+            if (!hasReliablePair(landmarks, LM.LEFT_SHOULDER, LM.RIGHT_SHOULDER) || !hasReliablePair(landmarks, LM.LEFT_HIP, LM.RIGHT_HIP)) {
+                return null;
+            }
+
+            const pose = clonePoseState(currentPoseState || defaultPoseState);
+            const worldQuaternionMap = getWorldQuaternionMap(pose);
+            const world = worldLandmarks.map(toWorldVector);
+
+            const hipsCenter = midpointVector(world[LM.LEFT_HIP], world[LM.RIGHT_HIP]);
+            const shouldersCenter = midpointVector(world[LM.LEFT_SHOULDER], world[LM.RIGHT_SHOULDER]);
+            const torsoUp = directionBetween(hipsCenter, shouldersCenter);
+            const bodyLeft = averageDirection([
+                directionBetween(world[LM.RIGHT_HIP], world[LM.LEFT_HIP]),
+                directionBetween(world[LM.RIGHT_SHOULDER], world[LM.LEFT_SHOULDER])
+            ]);
+
+            if (torsoUp && bodyLeft) {
+                const hipsWorldQuaternion = quaternionFromBasis(bodyLeft, torsoUp);
+                setWorldQuaternionOnPose(pose, worldQuaternionMap, 'Hips_0', hipsWorldQuaternion);
+                setWorldQuaternionOnPose(pose, worldQuaternionMap, 'Spine_0', hipsWorldQuaternion);
+            }
+
+            const headLeft = averageDirection([
+                directionBetween(world[LM.RIGHT_EAR], world[LM.LEFT_EAR]),
+                directionBetween(world[LM.RIGHT_SHOULDER], world[LM.LEFT_SHOULDER])
+            ]);
+            const headUp = averageDirection([
+                directionBetween(shouldersCenter, world[LM.NOSE]),
+                torsoUp
+            ]);
+            if (headLeft && headUp) {
+                const headWorldQuaternion = quaternionFromBasis(headLeft, headUp);
+                setWorldQuaternionOnPose(pose, worldQuaternionMap, 'Head_0', headWorldQuaternion);
+            }
+
+            applyLimbDirection(pose, worldQuaternionMap, 'Left_Upper_Arm_0', directionBetween(world[LM.LEFT_SHOULDER], world[LM.LEFT_ELBOW]));
+            applyLimbDirection(pose, worldQuaternionMap, 'Left_Lower_Arm_0', directionBetween(world[LM.LEFT_ELBOW], world[LM.LEFT_WRIST]));
+            applyLimbDirection(pose, worldQuaternionMap, 'Right_Upper_Arm_0', directionBetween(world[LM.RIGHT_SHOULDER], world[LM.RIGHT_ELBOW]));
+            applyLimbDirection(pose, worldQuaternionMap, 'Right_Lower_Arm_0', directionBetween(world[LM.RIGHT_ELBOW], world[LM.RIGHT_WRIST]));
+            applyLimbDirection(pose, worldQuaternionMap, 'Left_Upper_Leg_0', directionBetween(world[LM.LEFT_HIP], world[LM.LEFT_KNEE]));
+            applyLimbDirection(pose, worldQuaternionMap, 'Left_Lower_Leg_0', directionBetween(world[LM.LEFT_KNEE], world[LM.LEFT_ANKLE]));
+            applyLimbDirection(pose, worldQuaternionMap, 'Right_Upper_Leg_0', directionBetween(world[LM.RIGHT_HIP], world[LM.RIGHT_KNEE]));
+            applyLimbDirection(pose, worldQuaternionMap, 'Right_Lower_Leg_0', directionBetween(world[LM.RIGHT_KNEE], world[LM.RIGHT_ANKLE]));
+
+            pose.Hips_0.position.copy(computeRootPosition(landmarks));
+            return pose;
+        }
+
+        function applyLimbDirection(pose, worldQuaternionMap, jointName, direction) {
+            if (!direction) return;
+            const worldQuaternion = new THREE.Quaternion().setFromUnitVectors(DOWN_AXIS, direction);
+            setWorldQuaternionOnPose(pose, worldQuaternionMap, jointName, worldQuaternion);
+        }
+
+        function computeRootPosition(landmarks) {
+            const rootPosition = defaultPoseState.Hips_0.position.clone();
+
+            if (!ui.rootMotion.checked) {
+                return rootPosition;
+            }
+
+            const leftHip = landmarks[LM.LEFT_HIP];
+            const rightHip = landmarks[LM.RIGHT_HIP];
+            const leftShoulder = landmarks[LM.LEFT_SHOULDER];
+            const rightShoulder = landmarks[LM.RIGHT_SHOULDER];
+
+            if (!leftHip || !rightHip || !leftShoulder || !rightShoulder) {
+                return rootPosition;
+            }
+
+            const hipCenter = midpointLandmark(leftHip, rightHip);
+            const shoulderSpan = distance2D(leftShoulder, rightShoulder);
+
+            if (!rootBaseline) {
+                rootBaseline = {
+                    x: hipCenter.x,
+                    y: hipCenter.y,
+                    shoulderSpan: shoulderSpan || 0.2
+                };
+            }
+
+            const deltaX = (hipCenter.x - rootBaseline.x) * 8;
+            const deltaY = (rootBaseline.y - hipCenter.y) * 10;
+            const depthDelta = (shoulderSpan - rootBaseline.shoulderSpan) * 9;
+
+            rootPosition.x = THREE.MathUtils.clamp(ROOT_BASE_POSITION.x + deltaX, -4.5, 4.5);
+            rootPosition.y = THREE.MathUtils.clamp(ROOT_BASE_POSITION.y + deltaY, 1.1, 6.4);
+            rootPosition.z = THREE.MathUtils.clamp(ROOT_BASE_POSITION.z + depthDelta, -3.25, 3.25);
+
+            return rootPosition;
+        }
+
+        function smoothPoseState(previousPose, nextPose, smoothing) {
+            if (!previousPose) {
+                return clonePoseState(nextPose);
+            }
+
+            const alpha = THREE.MathUtils.clamp(1 - smoothing, 0.05, 1);
+            const pose = clonePoseState(previousPose);
+
+            JOINT_ORDER.forEach(name => {
+                pose[name].position.lerp(nextPose[name].position, alpha);
+                pose[name].quaternion.slerp(nextPose[name].quaternion, alpha).normalize();
+            });
+
+            return pose;
+        }
+
+        function getWorldQuaternionMap(pose) {
+            const map = {};
+
+            JOINT_ORDER.forEach(name => {
+                const parentName = JOINT_PARENTS[name];
+                if (!parentName) {
+                    map[name] = pose[name].quaternion.clone();
+                    return;
+                }
+
+                map[name] = map[parentName].clone().multiply(pose[name].quaternion);
+            });
+
+            return map;
+        }
+
+        function setWorldQuaternionOnPose(pose, worldQuaternionMap, jointName, worldQuaternion) {
+            const parentName = JOINT_PARENTS[jointName];
+
+            if (parentName) {
+                pose[jointName].quaternion.copy(worldQuaternionMap[parentName].clone().invert().multiply(worldQuaternion)).normalize();
+            } else {
+                pose[jointName].quaternion.copy(worldQuaternion).normalize();
+            }
+
+            worldQuaternionMap[jointName] = worldQuaternion.clone();
+        }
+
+        function quaternionFromBasis(leftAxis, upAxis) {
+            const yAxis = upAxis.clone().normalize();
+            let xAxis = leftAxis.clone();
+            xAxis.sub(yAxis.clone().multiplyScalar(xAxis.dot(yAxis)));
+
+            if (xAxis.lengthSq() < 1e-8) {
+                xAxis = Math.abs(yAxis.y) < 0.95
+                    ? new THREE.Vector3(0, 1, 0)
+                    : new THREE.Vector3(0, 0, 1);
+                xAxis.sub(yAxis.clone().multiplyScalar(xAxis.dot(yAxis)));
+            }
+
+            if (xAxis.lengthSq() < 1e-8) {
+                return new THREE.Quaternion();
+            }
+
+            xAxis.normalize();
+            const zAxis = new THREE.Vector3().crossVectors(xAxis, yAxis).normalize();
+            const correctedXAxis = new THREE.Vector3().crossVectors(yAxis, zAxis).normalize();
+            const matrix = new THREE.Matrix4().makeBasis(correctedXAxis, yAxis, zAxis);
+            return new THREE.Quaternion().setFromRotationMatrix(matrix);
+        }
+
+        function samplePoseIfRecording(nowMs) {
+            if (!isRecording || !currentPoseState) return;
+
+            const interval = 1 / (Number.parseInt(ui.sampleRate.value, 10) || 10);
+            const elapsedSeconds = (nowMs - recordingStartedAt) / 1000;
+
+            if (elapsedSeconds + 1e-6 < lastSampledAt + interval) {
+                return;
+            }
+
+            const roundedTime = roundTime(elapsedSeconds);
+            const serializedPose = serializePose(currentPoseState);
+            const lastFrame = recordedFrames[recordedFrames.length - 1];
+
+            if (lastFrame && Math.abs(lastFrame.time - roundedTime) < 1e-6) {
+                lastFrame.pose = serializedPose;
+            } else {
+                recordedFrames.push({
+                    time: roundedTime,
+                    pose: serializedPose
+                });
+            }
+
+            lastSampledAt = roundedTime;
+            updateStats();
+        }
+
+        function toggleRecording() {
+            if (isRecording) {
+                stopRecording();
+                return;
+            }
+
+            if (!latestPosePacket) {
+                setStatus('Wait for a tracked performer before recording.', 'error');
+                return;
+            }
+
+            if (!ui.animationName.value.trim()) {
+                setGeneratedAnimationName();
+            }
+
+            recordedFrames = [];
+            isRecording = true;
+            recordingStartedAt = performance.now();
+            lastSampledAt = -Infinity;
+            if (ui.rootMotion.checked) {
+                captureNeutralPose({ quiet: true });
+            }
+            samplePoseIfRecording(recordingStartedAt);
+            updateRecordingUi();
+            setStatus('Recording started. Let the reference motion play, then click Stop.', 'success');
+        }
+
+        function stopRecording() {
+            isRecording = false;
+            updateRecordingUi();
+            updateStats();
+            setStatus(
+                recordedFrames.length > 0
+                    ? `Recording stopped with ${recordedFrames.length} captured keyframes.`
+                    : 'Recording stopped before any keyframes were captured.',
+                recordedFrames.length > 0 ? 'success' : 'info'
+            );
+        }
+
+        function clearRecording() {
+            isRecording = false;
+            recordedFrames = [];
+            lastSampledAt = -Infinity;
+            rootBaseline = null;
+            currentPoseState = clonePoseState(defaultPoseState);
+            applyPoseState(currentPoseState);
+            updateRecordingUi();
+            updateStats();
+            setStatus('Capture cleared. Share a source again or keep the current stream and record a new take.', 'info');
+        }
+
+        function captureNeutralPose(options = {}) {
+            if (!latestPosePacket) {
+                if (!options.quiet) {
+                    setStatus('A tracked performer is required before setting the neutral pose.', 'error');
+                }
+                return;
+            }
+
+            const { landmarks } = latestPosePacket;
+            const hipCenter = midpointLandmark(landmarks[LM.LEFT_HIP], landmarks[LM.RIGHT_HIP]);
+            const shoulderSpan = distance2D(landmarks[LM.LEFT_SHOULDER], landmarks[LM.RIGHT_SHOULDER]);
+
+            rootBaseline = {
+                x: hipCenter.x,
+                y: hipCenter.y,
+                shoulderSpan: shoulderSpan || 0.2
+            };
+
+            if (!options.quiet) {
+                setStatus('Neutral pose captured. Root motion will now be measured relative to this frame.', 'success');
+            }
+        }
+
+        function createAnimationAsset() {
+            if (recordedFrames.length === 0) {
+                throw new Error('Record at least one keyframe before saving or exporting.');
+            }
+
+            const name = ensureAnimationName();
+            const uniqueFrames = new Map();
+            recordedFrames.forEach(frame => {
+                uniqueFrames.set(frame.time.toFixed(1), {
+                    time: roundTime(frame.time),
+                    pose: frame.pose
+                });
+            });
+
+            return {
+                format: ASSET_FORMAT,
+                version: ASSET_VERSION,
+                type: 'animation',
+                name,
+                savedAt: new Date().toISOString(),
+                scene: {
+                    characterCount: 1,
+                    characterColors: [previewRoot.userData.characterColor || DEFAULT_COLOR]
+                },
+                playbackSpeed: 1,
+                keyframes: Array.from(uniqueFrames.values()).sort((a, b) => a.time - b.time)
+            };
+        }
+
+        function exportAnimation() {
+            try {
+                const asset = createAnimationAsset();
+                downloadAssetFile(asset);
+                setStatus(`Animation "${asset.name}" exported as JSON. Import it from the main Index.html animation library.`, 'success');
+            } catch (error) {
+                setStatus(error instanceof Error ? error.message : 'Could not export the animation.', 'error');
+            }
+        }
+
+        function saveAnimationToLibrary() {
+            try {
+                const asset = createAnimationAsset();
+                const raw = window.localStorage.getItem(MAIN_ANIMATION_STORAGE_KEY);
+                const library = JSON.parse(raw || '[]');
+                const safeLibrary = Array.isArray(library) ? library : [];
+                const existingIndex = safeLibrary.findIndex(entry => entry?.name?.toLowerCase?.() === asset.name.toLowerCase());
+
+                if (existingIndex >= 0) {
+                    safeLibrary.splice(existingIndex, 1);
+                }
+
+                safeLibrary.unshift(asset);
+                window.localStorage.setItem(MAIN_ANIMATION_STORAGE_KEY, JSON.stringify(safeLibrary));
+                setStatus(`Animation "${asset.name}" was saved into the shared browser library. Open Index.html and load it from Animation Library.`, 'success');
+            } catch (error) {
+                console.error(error);
+                setStatus('Could not save into the shared browser library. Use Export JSON instead.', 'error');
+            }
+        }
+
+        function downloadAssetFile(asset) {
+            const blob = new Blob([JSON.stringify(asset, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const safeName = asset.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'motion-rip';
+
+            link.href = url;
+            link.download = `${safeName}.animation.json`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        function serializePose(pose) {
+            const serialized = {};
+
+            JOINT_ORDER.forEach(name => {
+                const transform = pose[name];
+                serialized[name] = {
+                    position: [transform.position.x, transform.position.y, transform.position.z],
+                    quaternion: [
+                        transform.quaternion.x,
+                        transform.quaternion.y,
+                        transform.quaternion.z,
+                        transform.quaternion.w
+                    ]
+                };
+            });
+
+            return serialized;
+        }
+
+        function setGeneratedAnimationName() {
+            if (ui.animationName.value.trim()) return;
+
+            const now = new Date();
+            const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+            const timePart = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+            ui.animationName.value = `rip-${datePart}-${timePart}`;
+        }
+
+        function ensureAnimationName() {
+            const trimmed = ui.animationName.value.trim();
+            if (trimmed) return trimmed;
+            setGeneratedAnimationName();
+            return ui.animationName.value.trim();
+        }
+
+        function updateSmoothingLabel() {
+            ui.smoothingValue.textContent = (Number.parseFloat(ui.smoothing.value) || 0).toFixed(2);
+        }
+
+        function updateRecordingUi() {
+            ui.recordBtn.textContent = isRecording ? 'Stop Record' : 'Start Record';
+            ui.recordBtn.className = isRecording
+                ? 'rounded-2xl bg-rose-500 px-4 py-3 text-sm font-semibold text-rose-950 transition hover:bg-rose-400'
+                : 'rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-400';
+            ui.recordingBadge.textContent = isRecording ? 'Recording' : 'Idle';
+            ui.recordingBadge.className = isRecording
+                ? 'rounded-full border border-rose-400/25 bg-rose-400/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-rose-200'
+                : 'rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-200';
+        }
+
+        function updateStats() {
+            ui.frameCount.textContent = String(recordedFrames.length);
+            const lastTime = recordedFrames.length > 0 ? recordedFrames[recordedFrames.length - 1].time : 0;
+            ui.durationValue.textContent = `${lastTime.toFixed(1)}s`;
+        }
+
+        function setStatus(message, tone = 'info') {
+            const classes = {
+                info: 'text-sm leading-6 text-slate-300',
+                success: 'text-sm leading-6 text-emerald-200',
+                error: 'text-sm leading-6 text-rose-200'
+            };
+
+            ui.statusText.className = classes[tone] || classes.info;
+            ui.statusText.textContent = message;
+        }
+
+        function renderScene() {
+            orbitControls.update();
+            renderer.render(scene, camera);
+        }
+
+        function handleResize() {
+            const width = ui.previewCanvas.clientWidth || 1;
+            const height = ui.previewCanvas.clientHeight || 1;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height, false);
+            resizeOverlayCanvas();
+        }
+
+        function resizeOverlayCanvas() {
+            const width = ui.poseOverlay.clientWidth || 1;
+            const height = ui.poseOverlay.clientHeight || 1;
+
+            if (ui.poseOverlay.width !== width || ui.poseOverlay.height !== height) {
+                ui.poseOverlay.width = width;
+                ui.poseOverlay.height = height;
+            }
+        }
+
+        function drawOverlay(landmarks) {
+            resizeOverlayCanvas();
+
+            const context = ui.poseOverlay.getContext('2d');
+            const width = ui.poseOverlay.width;
+            const height = ui.poseOverlay.height;
+            context.clearRect(0, 0, width, height);
+
+            const rect = getContainedVideoRect(width, height, ui.sourceVideo.videoWidth || 1, ui.sourceVideo.videoHeight || 1);
+            context.lineWidth = 3;
+            context.lineCap = 'round';
+            context.strokeStyle = 'rgba(34, 211, 238, 0.95)';
+            context.shadowBlur = 16;
+            context.shadowColor = 'rgba(34, 211, 238, 0.45)';
+
+            CONNECTIONS.forEach(([startIndex, endIndex]) => {
+                const start = landmarks[startIndex];
+                const end = landmarks[endIndex];
+                if (!isReliableLandmark(start) || !isReliableLandmark(end)) return;
+
+                const startPoint = projectLandmark(start, rect);
+                const endPoint = projectLandmark(end, rect);
+
+                context.beginPath();
+                context.moveTo(startPoint.x, startPoint.y);
+                context.lineTo(endPoint.x, endPoint.y);
+                context.stroke();
+            });
+
+            context.shadowBlur = 0;
+            landmarks.forEach(landmark => {
+                if (!isReliableLandmark(landmark)) return;
+                const point = projectLandmark(landmark, rect);
+                context.beginPath();
+                context.fillStyle = 'rgba(125, 211, 252, 0.95)';
+                context.arc(point.x, point.y, 4, 0, Math.PI * 2);
+                context.fill();
+            });
+        }
+
+        function clearOverlay() {
+            resizeOverlayCanvas();
+            const context = ui.poseOverlay.getContext('2d');
+            context.clearRect(0, 0, ui.poseOverlay.width, ui.poseOverlay.height);
+        }
+
+        function projectLandmark(landmark, rect) {
+            return {
+                x: rect.x + landmark.x * rect.width,
+                y: rect.y + landmark.y * rect.height
+            };
+        }
+
+        function getContainedVideoRect(canvasWidth, canvasHeight, videoWidth, videoHeight) {
+            const canvasAspect = canvasWidth / canvasHeight;
+            const videoAspect = videoWidth / videoHeight;
+
+            if (!Number.isFinite(videoAspect) || videoAspect <= 0) {
+                return { x: 0, y: 0, width: canvasWidth, height: canvasHeight };
+            }
+
+            if (videoAspect > canvasAspect) {
+                const width = canvasWidth;
+                const height = width / videoAspect;
+                return { x: 0, y: (canvasHeight - height) / 2, width, height };
+            }
+
+            const height = canvasHeight;
+            const width = height * videoAspect;
+            return { x: (canvasWidth - width) / 2, y: 0, width, height };
+        }
+
+        function hasReliablePair(landmarks, firstIndex, secondIndex) {
+            return isReliableLandmark(landmarks[firstIndex]) && isReliableLandmark(landmarks[secondIndex]);
+        }
+
+        function isReliableLandmark(landmark) {
+            return !!landmark && (landmark.visibility ?? 1) >= 0.45;
+        }
+
+        function getPoseConfidence(landmarks) {
+            const trackedIndices = [
+                LM.LEFT_SHOULDER,
+                LM.RIGHT_SHOULDER,
+                LM.LEFT_ELBOW,
+                LM.RIGHT_ELBOW,
+                LM.LEFT_HIP,
+                LM.RIGHT_HIP,
+                LM.LEFT_KNEE,
+                LM.RIGHT_KNEE
+            ];
+
+            const scores = trackedIndices
+                .map(index => landmarks[index]?.visibility)
+                .filter(score => Number.isFinite(score));
+
+            if (scores.length === 0) return 0;
+            return scores.reduce((sum, score) => sum + score, 0) / scores.length;
+        }
+
+        function toWorldVector(landmark) {
+            if (!landmark) return null;
+            return new THREE.Vector3(landmark.x, -landmark.y, -landmark.z);
+        }
+
+        function midpointVector(a, b) {
+            if (!a || !b) return null;
+            return a.clone().add(b).multiplyScalar(0.5);
+        }
+
+        function midpointLandmark(a, b) {
+            return {
+                x: ((a?.x ?? 0) + (b?.x ?? 0)) * 0.5,
+                y: ((a?.y ?? 0) + (b?.y ?? 0)) * 0.5
+            };
+        }
+
+        function directionBetween(start, end) {
+            if (!start || !end) return null;
+            const direction = end.clone().sub(start);
+            if (direction.lengthSq() < 1e-8) return null;
+            return direction.normalize();
+        }
+
+        function averageDirection(vectors) {
+            const sum = new THREE.Vector3();
+            let count = 0;
+
+            vectors.forEach(vector => {
+                if (!vector || vector.lengthSq() < 1e-8) return;
+                sum.add(vector);
+                count += 1;
+            });
+
+            if (count === 0 || sum.lengthSq() < 1e-8) {
+                return null;
+            }
+
+            return sum.normalize();
+        }
+
+        function distance2D(a, b) {
+            if (!a || !b) return 0;
+            return Math.hypot((a.x ?? 0) - (b.x ?? 0), (a.y ?? 0) - (b.y ?? 0));
+        }
+
+        function roundTime(value) {
+            return Math.round((value + Number.EPSILON) / KEYFRAME_TIME_STEP) * KEYFRAME_TIME_STEP;
+        }
+    </script>
+</body>
+</html>
