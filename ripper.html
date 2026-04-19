@@ -87,9 +87,15 @@
                 </div>
 
                 <div class="mt-5 space-y-3">
-                    <button id="share-screen-btn" class="w-full rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400">
-                        Share Screen / Window
-                    </button>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="share-screen-btn" class="rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400">
+                            Share Screen
+                        </button>
+                        <button id="upload-video-btn" class="rounded-2xl bg-purple-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-purple-400">
+                            Upload Video
+                        </button>
+                    </div>
+                    <input id="video-file-input" type="file" accept="video/*" style="display: none;">
                     <div class="grid grid-cols-2 gap-2">
                         <button id="stop-share-btn" class="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-white/10">
                             Stop Share
@@ -188,7 +194,7 @@
                 <div class="mt-5 rounded-3xl border border-white/10 bg-white/[0.035] p-4">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Workflow</p>
                     <ol class="mt-3 space-y-2 text-sm leading-6 text-slate-300">
-                        <li>1. Share the window or screen where the reference video is playing.</li>
+                        <li>1. Share your screen or upload a video file.</li>
                         <li>2. Let the cyan skeleton lock onto the performer, then click <span class="font-semibold text-white">Set Neutral</span>.</li>
                         <li>3. Press <span class="font-semibold text-white">Start Record</span>, play the move, then stop and export or save.</li>
                     </ol>
@@ -320,6 +326,7 @@
         let recordedFrames = [];
         let latestPosePacket = null;
         let rootBaseline = null;
+        let isPlayingUploadedVideo = false;
 
         init();
 
@@ -342,6 +349,8 @@
 
         function cacheUi() {
             ui.shareScreenBtn = document.getElementById('share-screen-btn');
+            ui.uploadVideoBtn = document.getElementById('upload-video-btn');
+            ui.videoFileInput = document.getElementById('video-file-input');
             ui.stopShareBtn = document.getElementById('stop-share-btn');
             ui.neutralBtn = document.getElementById('neutral-btn');
             ui.recordBtn = document.getElementById('record-btn');
@@ -368,6 +377,8 @@
 
         function bindUi() {
             ui.shareScreenBtn.addEventListener('click', startScreenShare);
+            ui.uploadVideoBtn.addEventListener('click', () => ui.videoFileInput.click());
+            ui.videoFileInput.addEventListener('change', handleVideoFileSelected);
             ui.stopShareBtn.addEventListener('click', stopScreenShare);
             ui.neutralBtn.addEventListener('click', captureNeutralPose);
             ui.recordBtn.addEventListener('click', toggleRecording);
@@ -571,7 +582,7 @@
         async function warmupMediaPipe() {
             try {
                 await ensurePoseLandmarker();
-                setStatus('MediaPipe is ready. Share the window or screen where your reference clip is playing.', 'success');
+                setStatus('MediaPipe is ready. Share your screen or upload a video file.', 'success');
             } catch (error) {
                 console.error(error);
                 setStatus('MediaPipe could not load. Check your internet connection and reload this page.', 'error');
@@ -670,6 +681,7 @@
 
             ui.sourceVideo.pause();
             ui.sourceVideo.srcObject = null;
+            isPlayingUploadedVideo = false;
             lastProcessedVideoTime = -1;
             latestPosePacket = null;
             ui.trackedState.textContent = 'Waiting';
@@ -682,14 +694,15 @@
             }
 
             if (!options.skipStatus) {
-                setStatus('Screen share stopped. You can still export the captured frames, or share a new source.', 'info');
+                setStatus('Video source stopped. You can still export the captured frames, or load a new source.', 'info');
             }
         }
 
         function processFrame() {
             animationFrameId = requestAnimationFrame(processFrame);
 
-            if (!poseLandmarker || !mediaStream) return;
+            if (!poseLandmarker) return;
+            if (!mediaStream && !isPlayingUploadedVideo) return;
             if (ui.sourceVideo.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
             if (ui.sourceVideo.currentTime === lastProcessedVideoTime) return;
 
@@ -726,6 +739,42 @@
             currentPoseState = smoothPoseState(currentPoseState, targetPose, Number.parseFloat(ui.smoothing.value) || 0);
             applyPoseState(currentPoseState);
             samplePoseIfRecording(performance.now());
+        }
+
+        async function handleVideoFileSelected(event) {
+            const file = event.target.files?.[0];
+            if (!file) return;
+
+            try {
+                await ensurePoseLandmarker();
+
+                if (mediaStream) {
+                    stopScreenShare({ preservePose: true, skipStatus: true });
+                }
+
+                const videoUrl = URL.createObjectURL(file);
+                ui.sourceVideo.src = videoUrl;
+                ui.sourceVideo.controls = true;
+                ui.videoMeta.textContent = file.name;
+                isPlayingUploadedVideo = true;
+                rootBaseline = null;
+                lastProcessedVideoTime = -1;
+
+                ui.sourceVideo.play().catch(err => {
+                    console.error('Video playback error:', err);
+                    setStatus('Could not play the video file. Try a different format (MP4, WebM, etc.).', 'error');
+                });
+
+                processFrame();
+                setStatus('Video loaded. Play the video and let the skeleton lock onto the performer, then record.', 'success');
+
+                // Reset file input so same file can be selected again
+                ui.videoFileInput.value = '';
+            } catch (error) {
+                console.error(error);
+                setStatus('Could not load the video file.', 'error');
+                ui.videoFileInput.value = '';
+            }
         }
 
         function buildPoseFromLandmarks(landmarks, worldLandmarks) {

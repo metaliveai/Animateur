@@ -66,72 +66,72 @@
     <!-- UI Overlay -->
     <div id="ui-layer" class="absolute inset-0 p-4 flex flex-col justify-between z-10">
         <div class="flex justify-between items-start">
-            <div class="bg-black/60 backdrop-blur-md p-4 rounded-xl border border-white/10 shadow-xl interactive-ui w-80 max-h-[calc(100vh-2rem)] overflow-y-auto">
-                <h1 class="text-xl font-bold mb-1 flex items-center gap-2">
-                    <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+            <div class="bg-black/60 backdrop-blur-md p-2 rounded-xl border border-white/10 shadow-xl interactive-ui w-56 max-h-[calc(100vh-2rem)] overflow-y-auto">
+                <h1 class="text-sm font-bold mb-0.5 flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                     Fast Poser
                 </h1>
-                <p class="text-sm text-gray-400 mb-4">Click a body part to select. Use the gizmo to pose.</p>
+                <p class="text-xs text-gray-400 mb-2">Click a body part to select. Use the gizmo to pose.</p>
                 
-                <div class="space-y-3">
-                    <button id="add-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                <div class="space-y-2">
+                    <button id="add-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-1.5 px-3 rounded-lg transition-colors flex items-center justify-center gap-1.5 text-sm">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                         Add Character
                     </button>
                     
-                    <div class="flex gap-2">
-                        <button id="mode-rotate" class="flex-1 bg-white/20 hover:bg-white/30 text-white font-medium py-1.5 px-3 rounded-lg transition-colors border border-white/20">Rotate (R)</button>
-                        <button id="mode-translate" class="flex-1 bg-white/5 hover:bg-white/10 text-gray-300 font-medium py-1.5 px-3 rounded-lg transition-colors border border-white/10">Move (T)</button>
+                    <div class="flex gap-1.5">
+                        <button id="mode-rotate" class="flex-1 bg-white/20 hover:bg-white/30 text-white font-medium py-1 px-2 rounded-lg transition-colors border border-white/20 text-xs">Rotate (R)</button>
+                        <button id="mode-translate" class="flex-1 bg-white/5 hover:bg-white/10 text-gray-300 font-medium py-1 px-2 rounded-lg transition-colors border border-white/10 text-xs">Move (T)</button>
                     </div>
 
-                    <button id="clear-btn" class="w-full bg-red-900/50 hover:bg-red-800/60 text-red-200 text-sm font-medium py-1.5 px-4 rounded-lg transition-colors border border-red-900/50 mt-2">
+                    <button id="clear-btn" class="w-full bg-red-900/50 hover:bg-red-800/60 text-red-200 text-xs font-medium py-1 px-3 rounded-lg transition-colors border border-red-900/50">
                         Clear Scene
                     </button>
 
-                    <div class="pt-3 border-t border-white/10 space-y-3">
-                        <div class="rounded-xl border border-white/10 bg-white/[0.03] p-3 space-y-2.5">
-                            <div class="flex items-center justify-between gap-3">
-                                <h2 class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Pose Library</h2>
-                                <span class="text-[11px] text-gray-500">Save and reuse still poses</span>
+                    <div class="pt-2 border-t border-white/10 space-y-2">
+                        <div class="rounded-xl border border-white/10 bg-white/[0.03] p-2 space-y-1.5">
+                            <div class="flex items-center justify-between gap-2">
+                                <h2 class="text-xs font-semibold uppercase tracking-[0.15em] text-gray-400">Poses</h2>
+                                <span class="text-[10px] text-gray-500">Save poses</span>
                             </div>
-                            <input id="pose-name-input" type="text" placeholder="Pose name" class="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-400 placeholder:text-gray-500">
-                            <select id="pose-library" size="4" class="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-sm text-white outline-none focus:border-blue-400"></select>
-                            <div class="grid grid-cols-2 gap-2">
-                                <button id="save-pose-btn" class="bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium py-2 px-3 rounded-lg transition-colors">Save Pose</button>
-                                <button id="apply-pose-btn" class="bg-white/10 hover:bg-white/15 text-white text-sm font-medium py-2 px-3 rounded-lg border border-white/10 transition-colors">Apply Pose</button>
-                                <button id="export-pose-btn" class="bg-white/10 hover:bg-white/15 text-white text-sm font-medium py-2 px-3 rounded-lg border border-white/10 transition-colors">Export Pose</button>
-                                <button id="import-pose-btn" class="bg-white/10 hover:bg-white/15 text-white text-sm font-medium py-2 px-3 rounded-lg border border-white/10 transition-colors">Import Pose</button>
+                            <input id="pose-name-input" type="text" placeholder="Pose name" class="w-full bg-white/10 border border-white/10 rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-blue-400 placeholder:text-gray-500">
+                            <select id="pose-library" size="3" class="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-blue-400"></select>
+                            <div class="grid grid-cols-2 gap-1.5">
+                                <button id="save-pose-btn" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium py-1 px-2 rounded-lg transition-colors">Save</button>
+                                <button id="apply-pose-btn" class="bg-white/10 hover:bg-white/15 text-white text-xs font-medium py-1 px-2 rounded-lg border border-white/10 transition-colors">Apply</button>
+                                <button id="export-pose-btn" class="bg-white/10 hover:bg-white/15 text-white text-xs font-medium py-1 px-2 rounded-lg border border-white/10 transition-colors">Export</button>
+                                <button id="import-pose-btn" class="bg-white/10 hover:bg-white/15 text-white text-xs font-medium py-1 px-2 rounded-lg border border-white/10 transition-colors">Import</button>
                             </div>
-                            <button id="delete-pose-btn" class="w-full bg-red-900/40 hover:bg-red-800/55 text-red-200 text-sm font-medium py-2 px-3 rounded-lg border border-red-900/40 transition-colors">Delete Pose</button>
+                            <button id="delete-pose-btn" class="w-full bg-red-900/40 hover:bg-red-800/55 text-red-200 text-xs font-medium py-1 px-2 rounded-lg border border-red-900/40 transition-colors">Delete</button>
                         </div>
 
-                        <div class="rounded-xl border border-white/10 bg-white/[0.03] p-3 space-y-2.5">
-                            <div class="flex items-center justify-between gap-3">
-                                <h2 class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Animation Library</h2>
-                                <span class="text-[11px] text-gray-500">Save, import and edit timelines</span>
+                        <div class="rounded-xl border border-white/10 bg-white/[0.03] p-2 space-y-1.5">
+                            <div class="flex items-center justify-between gap-2">
+                                <h2 class="text-xs font-semibold uppercase tracking-[0.15em] text-gray-400">Animations</h2>
+                                <span class="text-[10px] text-gray-500">Save anim</span>
                             </div>
-                            <input id="animation-name-input" type="text" placeholder="Animation name" class="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-400 placeholder:text-gray-500">
-                            <select id="animation-library" size="4" class="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-sm text-white outline-none focus:border-blue-400"></select>
-                            <div class="grid grid-cols-2 gap-2">
-                                <button id="save-animation-btn" class="bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium py-2 px-3 rounded-lg transition-colors">Save Anim</button>
-                                <button id="load-animation-btn" class="bg-white/10 hover:bg-white/15 text-white text-sm font-medium py-2 px-3 rounded-lg border border-white/10 transition-colors">Load Anim</button>
-                                <button id="export-animation-btn" class="bg-white/10 hover:bg-white/15 text-white text-sm font-medium py-2 px-3 rounded-lg border border-white/10 transition-colors">Export Anim</button>
-                                <button id="import-animation-btn" class="bg-white/10 hover:bg-white/15 text-white text-sm font-medium py-2 px-3 rounded-lg border border-white/10 transition-colors">Import Anim</button>
+                            <input id="animation-name-input" type="text" placeholder="Animation name" class="w-full bg-white/10 border border-white/10 rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-blue-400 placeholder:text-gray-500">
+                            <select id="animation-library" size="3" class="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-blue-400"></select>
+                            <div class="grid grid-cols-2 gap-1.5">
+                                <button id="save-animation-btn" class="bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium py-1 px-2 rounded-lg transition-colors">Save</button>
+                                <button id="load-animation-btn" class="bg-white/10 hover:bg-white/15 text-white text-xs font-medium py-1 px-2 rounded-lg border border-white/10 transition-colors">Load</button>
+                                <button id="export-animation-btn" class="bg-white/10 hover:bg-white/15 text-white text-xs font-medium py-1 px-2 rounded-lg border border-white/10 transition-colors">Export</button>
+                                <button id="import-animation-btn" class="bg-white/10 hover:bg-white/15 text-white text-xs font-medium py-1 px-2 rounded-lg border border-white/10 transition-colors">Import</button>
                             </div>
-                            <button id="delete-animation-btn" class="w-full bg-red-900/40 hover:bg-red-800/55 text-red-200 text-sm font-medium py-2 px-3 rounded-lg border border-red-900/40 transition-colors">Delete Animation</button>
-                            <a href="./ripper.html" target="_blank" rel="noopener noreferrer" class="block w-full bg-emerald-600/85 hover:bg-emerald-500 text-center text-white text-sm font-medium py-2 px-3 rounded-lg transition-colors">
-                                Open Motion Ripper
+                            <button id="delete-animation-btn" class="w-full bg-red-900/40 hover:bg-red-800/55 text-red-200 text-xs font-medium py-1 px-2 rounded-lg border border-red-900/40 transition-colors">Delete</button>
+                            <a href="./ripper.html" target="_blank" rel="noopener noreferrer" class="block w-full bg-emerald-600/85 hover:bg-emerald-500 text-center text-white text-xs font-medium py-1 px-2 rounded-lg transition-colors">
+                                Ripper
                             </a>
-                            <a href="./AutoRigScene.html" target="_blank" rel="noopener noreferrer" class="block w-full bg-amber-500/85 hover:bg-amber-400 text-center text-slate-950 text-sm font-semibold py-2 px-3 rounded-lg transition-colors">
+                            <a href="./AutoRigScene.html" target="_blank" rel="noopener noreferrer" class="block w-full bg-amber-500/85 hover:bg-amber-400 text-center text-slate-950 text-xs font-semibold py-1 px-2 rounded-lg transition-colors">
                                 Open Auto Rig Scene
                             </a>
-                            <a href="./Playground.html" target="_blank" rel="noopener noreferrer" class="block w-full bg-cyan-600/85 hover:bg-cyan-500 text-center text-white text-sm font-medium py-2 px-3 rounded-lg transition-colors">
-                                Open Playground
+                            <a href="./Playground.html" target="_blank" rel="noopener noreferrer" class="block w-full bg-cyan-600/85 hover:bg-cyan-500 text-center text-white text-xs font-medium py-1 px-2 rounded-lg transition-colors">
+                                Playground
                             </a>
                         </div>
 
-                        <p id="asset-status" class="text-xs text-gray-400 min-h-[2.5rem] leading-5">
-                            Save reusable poses and animations here. Export/import uses JSON files, and Motion Ripper exports can be loaded back here.
+                        <p id="asset-status" class="text-xs text-gray-400 min-h-[1.75rem] leading-4">
+                            Save poses and anims here. Export/import JSON.
                         </p>
                     </div>
                 </div>
@@ -145,7 +145,7 @@
         </div>
 
         <!-- Animation Timeline / Controls -->
-        <div class="bg-black/80 backdrop-blur-md p-3 rounded-xl border border-white/10 shadow-xl interactive-ui w-full max-w-5xl mx-auto mt-auto">
+        <div class="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-md p-3 rounded-xl border border-white/10 shadow-xl interactive-ui">
             <div class="flex flex-wrap items-center gap-3">
                 <button id="add-kf-btn" class="bg-green-600 hover:bg-green-500 text-white font-semibold py-1.5 px-4 rounded-lg transition-colors flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
