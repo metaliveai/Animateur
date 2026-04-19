@@ -66,7 +66,7 @@
     <!-- UI Overlay -->
     <div id="ui-layer" class="absolute inset-0 p-4 flex flex-col justify-between z-10">
         <div class="flex justify-between items-start">
-            <div class="bg-black/60 backdrop-blur-md p-2 rounded-xl border border-white/10 shadow-xl interactive-ui w-56 max-h-[calc(100vh-2rem)] overflow-y-auto">
+            <div class="bg-black/60 backdrop-blur-md p-2 rounded-xl border border-white/10 shadow-xl interactive-ui w-72 max-h-[calc(100vh-2rem)] overflow-y-auto">
                 <h1 class="text-sm font-bold mb-0.5 flex items-center gap-1.5">
                     <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                     Fast Poser
@@ -74,14 +74,41 @@
                 <p class="text-xs text-gray-400 mb-2">Click a body part to select. Use the gizmo to pose.</p>
                 
                 <div class="space-y-2">
-                    <button id="add-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-1.5 px-3 rounded-lg transition-colors flex items-center justify-center gap-1.5 text-sm">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                        Add Character
-                    </button>
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <button id="add-btn" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-1.5 px-2 rounded-lg transition-colors flex items-center justify-center gap-1 text-xs">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                            Add Character
+                        </button>
+                        <button id="add-cube-btn" class="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold py-1.5 px-2 rounded-lg transition-colors flex items-center justify-center gap-1 text-xs">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linejoin="round" stroke-width="2" d="M4 7.5L12 3l8 4.5v9L12 21l-8-4.5v-9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 12l8-4.5M12 12v9M12 12L4 7.5"></path></svg>
+                            Add cube
+                        </button>
+                    </div>
                     
                     <div class="flex gap-1.5">
                         <button id="mode-rotate" class="flex-1 bg-white/20 hover:bg-white/30 text-white font-medium py-1 px-2 rounded-lg transition-colors border border-white/20 text-xs">Rotate (R)</button>
                         <button id="mode-translate" class="flex-1 bg-white/5 hover:bg-white/10 text-gray-300 font-medium py-1 px-2 rounded-lg transition-colors border border-white/10 text-xs">Move (T)</button>
+                    </div>
+
+                    <div id="reference-cube-panel" class="hidden rounded-xl border border-cyan-400/20 bg-cyan-400/[0.06] p-2 space-y-1.5">
+                        <div class="flex items-center justify-between gap-2">
+                            <h2 class="text-xs font-semibold uppercase tracking-[0.15em] text-cyan-200">Ref Cube</h2>
+                            <button id="delete-cube-btn" class="bg-red-900/40 hover:bg-red-800/55 text-red-200 text-[10px] font-medium py-0.5 px-2 rounded-lg border border-red-900/40 transition-colors">Delete</button>
+                        </div>
+                        <div class="grid grid-cols-3 gap-1.5">
+                            <label class="space-y-1 text-[10px] font-semibold text-gray-400">
+                                <span>W</span>
+                                <input id="cube-width-input" type="number" min="0.1" max="40" step="0.1" value="1" class="w-full bg-white/10 border border-white/10 rounded-lg px-1.5 py-1 text-xs text-white outline-none focus:border-cyan-300">
+                            </label>
+                            <label class="space-y-1 text-[10px] font-semibold text-gray-400">
+                                <span>H</span>
+                                <input id="cube-height-input" type="number" min="0.1" max="40" step="0.1" value="1" class="w-full bg-white/10 border border-white/10 rounded-lg px-1.5 py-1 text-xs text-white outline-none focus:border-cyan-300">
+                            </label>
+                            <label class="space-y-1 text-[10px] font-semibold text-gray-400">
+                                <span>D</span>
+                                <input id="cube-depth-input" type="number" min="0.1" max="40" step="0.1" value="1" class="w-full bg-white/10 border border-white/10 rounded-lg px-1.5 py-1 text-xs text-white outline-none focus:border-cyan-300">
+                            </label>
+                        </div>
                     </div>
 
                     <button id="clear-btn" class="w-full bg-red-900/50 hover:bg-red-800/60 text-red-200 text-xs font-medium py-1 px-3 rounded-lg transition-colors border border-red-900/50">
@@ -219,6 +246,9 @@
         let orbitControls, transformControl;
         const interactables = []; 
         let characters = [];
+        let referenceCubes = [];
+        let selectedReferenceCube = null;
+        let nextReferenceCubeId = 1;
         let selectedMesh = null;
         let selectedJoint = null;
         let translationHandle = null;
@@ -259,6 +289,8 @@
         const clock = new THREE.Clock();
         const ASSET_FORMAT = 'fast-poser-asset';
         const ASSET_VERSION = 1;
+        const REFERENCE_CUBE_MIN_SIZE = 0.1;
+        const REFERENCE_CUBE_MAX_SIZE = 40;
         const STORAGE_KEYS = {
             pose: 'fast-poser:pose-library',
             animation: 'fast-poser:animation-library'
@@ -372,7 +404,7 @@
                 const intersects = raycaster.intersectObjects( interactables, false );
 
                 if ( intersects.length > 0 ) {
-                    selectJoint(intersects[0].object);
+                    selectInteractable(intersects[0].object);
                 } else {
                     deselect();
                 }
@@ -383,13 +415,30 @@
                 createCharacter();
             });
 
+            ui.addCubeBtn.addEventListener('click', () => {
+                createReferenceCube();
+            });
+
             ui.clearBtn.addEventListener('click', () => {
                 clearSceneCharacters();
+                clearReferenceCubes();
                 clearKeyframes();
             });
 
             ui.modeRotateBtn.addEventListener('click', () => setMode('rotate'));
             ui.modeTranslateBtn.addEventListener('click', () => setMode('translate'));
+            ui.deleteCubeBtn.addEventListener('click', deleteSelectedReferenceCube);
+            [
+                ui.cubeWidthInput,
+                ui.cubeHeightInput,
+                ui.cubeDepthInput
+            ].forEach(input => {
+                input.addEventListener('input', handleReferenceCubeDimensionInput);
+                input.addEventListener('change', () => {
+                    handleReferenceCubeDimensionInput();
+                    syncReferenceCubeControls();
+                });
+            });
 
             // Animation UI Listeners
             ui.addKeyframeBtn.addEventListener('click', recordKeyframeAtCurrentTime);
@@ -439,7 +488,11 @@
                     togglePlay();
                 }
                 if (!isTyping && (event.key === 'Delete' || event.key === 'Backspace')) {
-                    deleteSelectedKeyframe();
+                    if (selectedReferenceCube) {
+                        deleteSelectedReferenceCube();
+                    } else {
+                        deleteSelectedKeyframe();
+                    }
                 }
             });
 
@@ -452,9 +505,15 @@
 
         function cacheUi() {
             ui.addBtn = document.getElementById('add-btn');
+            ui.addCubeBtn = document.getElementById('add-cube-btn');
             ui.clearBtn = document.getElementById('clear-btn');
             ui.modeRotateBtn = document.getElementById('mode-rotate');
             ui.modeTranslateBtn = document.getElementById('mode-translate');
+            ui.referenceCubePanel = document.getElementById('reference-cube-panel');
+            ui.cubeWidthInput = document.getElementById('cube-width-input');
+            ui.cubeHeightInput = document.getElementById('cube-height-input');
+            ui.cubeDepthInput = document.getElementById('cube-depth-input');
+            ui.deleteCubeBtn = document.getElementById('delete-cube-btn');
             ui.selectionInfo = document.getElementById('selection-info');
             ui.selectedName = document.getElementById('selected-name');
             ui.addKeyframeBtn = document.getElementById('add-kf-btn');
@@ -1451,6 +1510,8 @@
         }
 
         function handleTransformObjectChange() {
+            if (selectedReferenceCube) return;
+
             applyPullTranslation();
             handlePoseEdited();
         }
@@ -1574,6 +1635,13 @@
 
         function syncTransformAttachment() {
             if (!transformControl) return;
+
+            if (selectedReferenceCube) {
+                if (transformControl.object !== selectedReferenceCube) {
+                    transformControl.attach(selectedReferenceCube);
+                }
+                return;
+            }
 
             if (!selectedJoint) {
                 if (transformControl.object) {
@@ -2018,14 +2086,225 @@
             }
         }
 
+        function resetPullDragState() {
+            pullDragState.active = false;
+            pullDragState.characterRoot = null;
+            pullDragState.jointChain = [];
+        }
+
+        function setSelectedMeshEmissive(mesh, color) {
+            const materials = Array.isArray(mesh?.material) ? mesh.material : [mesh?.material];
+            materials.forEach(material => {
+                material?.emissive?.setHex?.(color);
+            });
+        }
+
+        function removeInteractableObject(object) {
+            const index = interactables.indexOf(object);
+            if (index !== -1) {
+                interactables.splice(index, 1);
+            }
+        }
+
+        function disposeRenderable(object) {
+            object.geometry?.dispose?.();
+            if (Array.isArray(object.material)) {
+                object.material.forEach(material => material?.dispose?.());
+            } else {
+                object.material?.dispose?.();
+            }
+        }
+
+        function selectInteractable(mesh) {
+            if (mesh.userData.referenceCube) {
+                selectReferenceCube(mesh.userData.referenceCube);
+                return;
+            }
+
+            if (mesh.userData.joint) {
+                selectJoint(mesh);
+            }
+        }
+
+        function getReferenceCubeDisplayName(cube) {
+            return cube.name.replace(/^Reference_Cube_/, 'Reference cube ').replace(/_/g, ' ');
+        }
+
+        function selectReferenceCube(cube) {
+            if (selectedMesh) {
+                setSelectedMeshEmissive(selectedMesh, 0x000000);
+            }
+
+            selectedMesh = cube.userData.mesh;
+            selectedJoint = null;
+            selectedReferenceCube = cube;
+            resetPullDragState();
+            setSelectedMeshEmissive(selectedMesh, 0x164e63);
+
+            syncTransformAttachment();
+            syncReferenceCubeControls();
+
+            ui.selectionInfo.classList.remove('hidden');
+            ui.selectedName.innerText = getReferenceCubeDisplayName(cube);
+        }
+
+        function clampReferenceCubeSize(value) {
+            return THREE.MathUtils.clamp(value, REFERENCE_CUBE_MIN_SIZE, REFERENCE_CUBE_MAX_SIZE);
+        }
+
+        function readReferenceCubeDimension(input, fallback) {
+            const value = Number.parseFloat(input.value);
+            return Number.isFinite(value) ? clampReferenceCubeSize(value) : fallback;
+        }
+
+        function formatReferenceCubeDimension(value) {
+            return Number.parseFloat(value.toFixed(2)).toString();
+        }
+
+        function syncReferenceCubeControls() {
+            if (!ui.referenceCubePanel) return;
+
+            if (!selectedReferenceCube) {
+                ui.referenceCubePanel.classList.add('hidden');
+                return;
+            }
+
+            const dimensions = selectedReferenceCube.userData.dimensions;
+            ui.referenceCubePanel.classList.remove('hidden');
+            ui.cubeWidthInput.value = formatReferenceCubeDimension(dimensions.width);
+            ui.cubeHeightInput.value = formatReferenceCubeDimension(dimensions.height);
+            ui.cubeDepthInput.value = formatReferenceCubeDimension(dimensions.depth);
+        }
+
+        function setReferenceCubeDimensions(cube, width, height, depth) {
+            const dimensions = {
+                width: clampReferenceCubeSize(width),
+                height: clampReferenceCubeSize(height),
+                depth: clampReferenceCubeSize(depth)
+            };
+
+            cube.scale.set(dimensions.width, dimensions.height, dimensions.depth);
+            cube.userData.dimensions = dimensions;
+            cube.updateMatrixWorld(true);
+        }
+
+        function handleReferenceCubeDimensionInput() {
+            if (!selectedReferenceCube) return;
+
+            const current = selectedReferenceCube.userData.dimensions;
+            setReferenceCubeDimensions(
+                selectedReferenceCube,
+                readReferenceCubeDimension(ui.cubeWidthInput, current.width),
+                readReferenceCubeDimension(ui.cubeHeightInput, current.height),
+                readReferenceCubeDimension(ui.cubeDepthInput, current.depth)
+            );
+        }
+
+        function getReferenceCubePlacement(index) {
+            return {
+                x: 2.25 + (index % 3) * 1.5,
+                z: -1.5 - Math.floor(index / 3) * 1.5
+            };
+        }
+
+        function createReferenceCube(options = {}) {
+            const cubeNumber = nextReferenceCubeId;
+            nextReferenceCubeId += 1;
+
+            const placement = getReferenceCubePlacement(referenceCubes.length);
+            const width = Number.isFinite(options.width) ? options.width : 1;
+            const height = Number.isFinite(options.height) ? options.height : 1;
+            const depth = Number.isFinite(options.depth) ? options.depth : 1;
+            const x = Number.isFinite(options.x) ? options.x : placement.x;
+            const y = Number.isFinite(options.y) ? options.y : 0;
+            const z = Number.isFinite(options.z) ? options.z : placement.z;
+
+            const group = new THREE.Group();
+            group.name = `Reference_Cube_${cubeNumber}`;
+            group.position.set(x, y, z);
+
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
+            geometry.translate(0, 0.5, 0);
+
+            const material = new THREE.MeshStandardMaterial({
+                color: 0x22d3ee,
+                emissive: 0x000000,
+                roughness: 0.55,
+                metalness: 0.02,
+                transparent: true,
+                opacity: 0.38,
+                depthWrite: false
+            });
+
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            mesh.userData.referenceCube = group;
+            group.add(mesh);
+
+            const edges = new THREE.LineSegments(
+                new THREE.EdgesGeometry(geometry),
+                new THREE.LineBasicMaterial({
+                    color: 0xa5f3fc,
+                    transparent: true,
+                    opacity: 0.9
+                })
+            );
+            group.add(edges);
+
+            group.userData.mesh = mesh;
+            group.userData.edges = edges;
+            group.userData.dimensions = { width: 1, height: 1, depth: 1 };
+            setReferenceCubeDimensions(group, width, height, depth);
+
+            scene.add(group);
+            referenceCubes.push(group);
+            interactables.push(mesh);
+            selectReferenceCube(group);
+            setStatus(`${getReferenceCubeDisplayName(group)} added.`, 'info');
+            return group;
+        }
+
+        function deleteReferenceCube(cube) {
+            if (!cube) return;
+
+            if (selectedReferenceCube === cube) {
+                deselect();
+            }
+
+            removeInteractableObject(cube.userData.mesh);
+            cube.traverse(obj => {
+                disposeRenderable(obj);
+            });
+            scene.remove(cube);
+            referenceCubes = referenceCubes.filter(item => item !== cube);
+        }
+
+        function deleteSelectedReferenceCube() {
+            const cube = selectedReferenceCube;
+            if (!cube) return;
+
+            const cubeName = getReferenceCubeDisplayName(cube);
+            deleteReferenceCube(cube);
+            setStatus(`${cubeName} deleted.`, 'info');
+        }
+
+        function clearReferenceCubes() {
+            const cubes = [...referenceCubes];
+            cubes.forEach(deleteReferenceCube);
+            referenceCubes = [];
+        }
+
         function selectJoint(mesh) {
             if(selectedMesh) {
-                selectedMesh.material.emissive.setHex(0x000000);
+                setSelectedMeshEmissive(selectedMesh, 0x000000);
             }
             selectedMesh = mesh;
             selectedJoint = mesh.userData.joint;
+            selectedReferenceCube = null;
+            syncReferenceCubeControls();
             // Highlight selected
-            selectedMesh.material.emissive.setHex(0x333333);
+            setSelectedMeshEmissive(selectedMesh, 0x333333);
 
             syncTransformAttachment();
 
@@ -2037,15 +2316,15 @@
 
         function deselect() {
             if(selectedMesh) {
-                selectedMesh.material.emissive.setHex(0x000000);
+                setSelectedMeshEmissive(selectedMesh, 0x000000);
                 selectedMesh = null;
             }
             selectedJoint = null;
-            pullDragState.active = false;
-            pullDragState.characterRoot = null;
-            pullDragState.jointChain = [];
+            selectedReferenceCube = null;
+            resetPullDragState();
             transformControl.detach();
             ui.selectionInfo.classList.add('hidden');
+            syncReferenceCubeControls();
         }
 
         function clearSceneCharacters() {
@@ -2054,18 +2333,13 @@
             characters.forEach(character => {
                 character.traverse(obj => {
                     if (!obj.isMesh) return;
-                    obj.geometry?.dispose?.();
-                    if (Array.isArray(obj.material)) {
-                        obj.material.forEach(material => material?.dispose?.());
-                    } else {
-                        obj.material?.dispose?.();
-                    }
+                    removeInteractableObject(obj);
+                    disposeRenderable(obj);
                 });
                 scene.remove(character);
             });
 
             characters = [];
-            interactables.length = 0;
         }
 
         function getCharacterPlacement(index) {
