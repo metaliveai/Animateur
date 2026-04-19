@@ -77,11 +77,11 @@
                     <div class="grid grid-cols-2 gap-1.5">
                         <button id="add-btn" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-1.5 px-2 rounded-lg transition-colors flex items-center justify-center gap-1 text-xs">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                            Add Character
+                            <span class="leading-tight">Add Character</span>
                         </button>
                         <button id="add-cube-btn" class="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold py-1.5 px-2 rounded-lg transition-colors flex items-center justify-center gap-1 text-xs">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linejoin="round" stroke-width="2" d="M4 7.5L12 3l8 4.5v9L12 21l-8-4.5v-9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 12l8-4.5M12 12v9M12 12L4 7.5"></path></svg>
-                            Add cube
+                            <span class="leading-tight">Add cube</span>
                         </button>
                     </div>
                     
@@ -107,6 +107,27 @@
                             <label class="space-y-1 text-[10px] font-semibold text-gray-400">
                                 <span>D</span>
                                 <input id="cube-depth-input" type="number" min="0.1" max="40" step="0.1" value="1" class="w-full bg-white/10 border border-white/10 rounded-lg px-1.5 py-1 text-xs text-white outline-none focus:border-cyan-300">
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="actor-size-panel" class="hidden rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] p-2 space-y-1.5">
+                        <div class="flex items-center justify-between gap-2">
+                            <h2 class="text-xs font-semibold uppercase tracking-[0.15em] text-emerald-200">Actor Size</h2>
+                            <span id="actor-size-name" class="text-[10px] text-emerald-100/80 truncate max-w-[8rem]">Selected</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-1.5">
+                            <label class="space-y-1 text-[10px] font-semibold text-gray-400">
+                                <span>W</span>
+                                <input id="actor-width-input" type="number" min="0.1" max="40" step="0.1" value="1" class="w-full bg-white/10 border border-white/10 rounded-lg px-1.5 py-1 text-xs text-white outline-none focus:border-emerald-300">
+                            </label>
+                            <label class="space-y-1 text-[10px] font-semibold text-gray-400">
+                                <span>H</span>
+                                <input id="actor-height-input" type="number" min="0.1" max="40" step="0.1" value="1" class="w-full bg-white/10 border border-white/10 rounded-lg px-1.5 py-1 text-xs text-white outline-none focus:border-emerald-300">
+                            </label>
+                            <label class="space-y-1 text-[10px] font-semibold text-gray-400">
+                                <span>D</span>
+                                <input id="actor-depth-input" type="number" min="0.1" max="40" step="0.1" value="1" class="w-full bg-white/10 border border-white/10 rounded-lg px-1.5 py-1 text-xs text-white outline-none focus:border-emerald-300">
                             </label>
                         </div>
                     </div>
@@ -439,6 +460,17 @@
                     syncReferenceCubeControls();
                 });
             });
+            [
+                ui.actorWidthInput,
+                ui.actorHeightInput,
+                ui.actorDepthInput
+            ].forEach(input => {
+                input.addEventListener('input', handleActorDimensionInput);
+                input.addEventListener('change', () => {
+                    handleActorDimensionInput();
+                    syncActorDimensionControls();
+                });
+            });
 
             // Animation UI Listeners
             ui.addKeyframeBtn.addEventListener('click', recordKeyframeAtCurrentTime);
@@ -514,6 +546,11 @@
             ui.cubeHeightInput = document.getElementById('cube-height-input');
             ui.cubeDepthInput = document.getElementById('cube-depth-input');
             ui.deleteCubeBtn = document.getElementById('delete-cube-btn');
+            ui.actorSizePanel = document.getElementById('actor-size-panel');
+            ui.actorSizeName = document.getElementById('actor-size-name');
+            ui.actorWidthInput = document.getElementById('actor-width-input');
+            ui.actorHeightInput = document.getElementById('actor-height-input');
+            ui.actorDepthInput = document.getElementById('actor-depth-input');
             ui.selectionInfo = document.getElementById('selection-info');
             ui.selectedName = document.getElementById('selected-name');
             ui.addKeyframeBtn = document.getElementById('add-kf-btn');
@@ -614,7 +651,7 @@
                 const option = document.createElement('option');
                 option.value = asset.name;
                 const count = getAssetCharacterCount(asset);
-                const countLabel = `${count} char${count === 1 ? '' : 's'}`;
+                const countLabel = `${count} actor${count === 1 ? '' : 's'}`;
                 option.textContent = `${asset.name} (${countLabel})`;
                 select.appendChild(option);
             });
@@ -879,7 +916,10 @@
                         transform.quaternion.y,
                         transform.quaternion.z,
                         transform.quaternion.w
-                    ]
+                    ],
+                    scale: transform.scale
+                        ? [transform.scale.x, transform.scale.y, transform.scale.z]
+                        : undefined
                 };
             });
 
@@ -892,9 +932,11 @@
             Object.entries(serializedPose || {}).forEach(([name, transform]) => {
                 const positionValues = Array.isArray(transform?.position) ? transform.position.slice(0, 3).map(Number) : [];
                 const quaternionValues = Array.isArray(transform?.quaternion) ? transform.quaternion.slice(0, 4).map(Number) : [];
+                const scaleValues = Array.isArray(transform?.scale) ? transform.scale.slice(0, 3).map(Number) : null;
 
                 if (positionValues.length !== 3 || quaternionValues.length !== 4) return;
                 if (![...positionValues, ...quaternionValues].every(Number.isFinite)) return;
+                if (scaleValues && (scaleValues.length !== 3 || !scaleValues.every(Number.isFinite))) return;
 
                 const quaternion = new THREE.Quaternion(...quaternionValues);
                 if (quaternion.lengthSq() === 0) {
@@ -905,7 +947,14 @@
 
                 pose[name] = {
                     position: new THREE.Vector3(...positionValues),
-                    quaternion
+                    quaternion,
+                    scale: scaleValues
+                        ? new THREE.Vector3(
+                            clampReferenceCubeSize(scaleValues[0]),
+                            clampReferenceCubeSize(scaleValues[1]),
+                            clampReferenceCubeSize(scaleValues[2])
+                        )
+                        : null
                 };
             });
 
@@ -1536,7 +1585,8 @@
                     if (obj.isGroup && obj.name && obj.name.includes('_')) {
                         pose[obj.name] = {
                             position: obj.position.clone(),
-                            quaternion: obj.quaternion.clone()
+                            quaternion: obj.quaternion.clone(),
+                            scale: obj.scale.clone()
                         };
                     }
                 });
@@ -1552,10 +1602,14 @@
                     if (!obj.isGroup || !obj.name || !pose[obj.name]) return;
                     obj.position.copy(pose[obj.name].position);
                     obj.quaternion.copy(pose[obj.name].quaternion);
+                    if (pose[obj.name].scale) {
+                        obj.scale.copy(pose[obj.name].scale);
+                    }
                 });
             });
 
             syncTransformAttachment();
+            syncActorDimensionControls();
         }
 
         function getCurrentTransformMode() {
@@ -1787,17 +1841,22 @@
                 if (poseA?.[name] && poseB?.[name]) {
                     blended[name] = {
                         position: poseA[name].position.clone().lerp(poseB[name].position, alpha),
-                        quaternion: poseA[name].quaternion.clone().slerp(poseB[name].quaternion, alpha)
+                        quaternion: poseA[name].quaternion.clone().slerp(poseB[name].quaternion, alpha),
+                        scale: poseA[name].scale && poseB[name].scale
+                            ? poseA[name].scale.clone().lerp(poseB[name].scale, alpha)
+                            : poseA[name].scale?.clone() ?? poseB[name].scale?.clone() ?? null
                     };
                 } else if (poseA?.[name]) {
                     blended[name] = {
                         position: poseA[name].position.clone(),
-                        quaternion: poseA[name].quaternion.clone()
+                        quaternion: poseA[name].quaternion.clone(),
+                        scale: poseA[name].scale?.clone() ?? null
                     };
                 } else if (poseB?.[name]) {
                     blended[name] = {
                         position: poseB[name].position.clone(),
-                        quaternion: poseB[name].quaternion.clone()
+                        quaternion: poseB[name].quaternion.clone(),
+                        scale: poseB[name].scale?.clone() ?? null
                     };
                 }
             });
@@ -2143,6 +2202,7 @@
 
             syncTransformAttachment();
             syncReferenceCubeControls();
+            syncActorDimensionControls();
 
             ui.selectionInfo.classList.remove('hidden');
             ui.selectedName.innerText = getReferenceCubeDisplayName(cube);
@@ -2174,6 +2234,72 @@
             ui.cubeWidthInput.value = formatReferenceCubeDimension(dimensions.width);
             ui.cubeHeightInput.value = formatReferenceCubeDimension(dimensions.height);
             ui.cubeDepthInput.value = formatReferenceCubeDimension(dimensions.depth);
+        }
+
+        function getActorDisplayName(character) {
+            const actorIndex = characters.indexOf(character) + 1;
+            return `Humanoid ${Math.max(1, actorIndex)}`;
+        }
+
+        function getSelectedActorRoot() {
+            if (!selectedJoint || selectedReferenceCube) return null;
+            return getCharacterRootFromJoint(selectedJoint);
+        }
+
+        function syncActorDimensionControls() {
+            if (!ui.actorSizePanel) return;
+
+            const actor = getSelectedActorRoot();
+            if (!actor) {
+                ui.actorSizePanel.classList.add('hidden');
+                return;
+            }
+
+            ui.actorSizePanel.classList.remove('hidden');
+            ui.actorSizeName.textContent = getActorDisplayName(actor);
+            ui.actorWidthInput.value = formatReferenceCubeDimension(actor.scale.x);
+            ui.actorHeightInput.value = formatReferenceCubeDimension(actor.scale.y);
+            ui.actorDepthInput.value = formatReferenceCubeDimension(actor.scale.z);
+        }
+
+        function readActorDimension(input, fallback) {
+            return readReferenceCubeDimension(input, fallback);
+        }
+
+        function setActorDimensions(actor, width, height, depth) {
+            const previousBounds = new THREE.Box3().setFromObject(actor);
+            const previousMinY = Number.isFinite(previousBounds.min.y) ? previousBounds.min.y : null;
+            const dimensions = {
+                width: clampReferenceCubeSize(width),
+                height: clampReferenceCubeSize(height),
+                depth: clampReferenceCubeSize(depth)
+            };
+
+            actor.scale.set(dimensions.width, dimensions.height, dimensions.depth);
+            actor.userData.dimensions = dimensions;
+            actor.updateMatrixWorld(true);
+
+            if (previousMinY !== null) {
+                const nextBounds = new THREE.Box3().setFromObject(actor);
+                if (Number.isFinite(nextBounds.min.y)) {
+                    actor.position.y += previousMinY - nextBounds.min.y;
+                    actor.updateMatrixWorld(true);
+                }
+            }
+        }
+
+        function handleActorDimensionInput() {
+            const actor = getSelectedActorRoot();
+            if (!actor) return;
+
+            setActorDimensions(
+                actor,
+                readActorDimension(ui.actorWidthInput, actor.scale.x),
+                readActorDimension(ui.actorHeightInput, actor.scale.y),
+                readActorDimension(ui.actorDepthInput, actor.scale.z)
+            );
+            syncTransformAttachment();
+            handlePoseEdited();
         }
 
         function setReferenceCubeDimensions(cube, width, height, depth) {
@@ -2303,6 +2429,7 @@
             selectedJoint = mesh.userData.joint;
             selectedReferenceCube = null;
             syncReferenceCubeControls();
+            syncActorDimensionControls();
             // Highlight selected
             setSelectedMeshEmissive(selectedMesh, 0x333333);
 
@@ -2310,7 +2437,9 @@
 
             // Show info
             ui.selectionInfo.classList.remove('hidden');
-            const cleanName = selectedJoint.name.replace(/_[0-9]+$/, '').replace(/_/g, ' ');
+            const cleanName = selectedJoint.name
+                .replace(/_[0-9]+$/, '')
+                .replace(/_/g, ' ');
             ui.selectedName.innerText = cleanName;
         }
 
@@ -2325,6 +2454,7 @@
             transformControl.detach();
             ui.selectionInfo.classList.add('hidden');
             syncReferenceCubeControls();
+            syncActorDimensionControls();
         }
 
         function clearSceneCharacters() {
@@ -2332,8 +2462,10 @@
 
             characters.forEach(character => {
                 character.traverse(obj => {
-                    if (!obj.isMesh) return;
-                    removeInteractableObject(obj);
+                    if (obj.isMesh) {
+                        removeInteractableObject(obj);
+                    }
+
                     disposeRenderable(obj);
                 });
                 scene.remove(character);
@@ -2368,7 +2500,12 @@
 
             character.traverse(obj => {
                 if (!obj.isMesh) return;
-                obj.material.color.copy(color);
+
+                const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+                materials.forEach(material => {
+                    if (!material?.color || obj.userData.preserveColor) return;
+                    material.color.copy(color);
+                });
             });
         }
 
